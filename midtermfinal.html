@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Whale Migration Map 🐋</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+  <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; }
+    #map { width: 100%; height: 100%; }
+
+    .control-panel {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(0, 0, 0, 0.85);
+      padding: 20px;
+      color: white;
+      font-family: sans-serif;
+      font-size: 14px;
+      z-index: 999;
+      border-radius: 10px;
+      max-width: 260px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.5);
+      transition: all 0.3s ease;
+    }
+
+    .control-panel.collapsed {
+      height: 40px;
+      overflow: hidden;
+      padding-bottom: 10px;
+    }
+
+    .control-panel h2 {
+      font-size: 16px;
+      margin-top: 0;
+      margin-bottom: 12px;
+      color: #00e0ff;
+    }
+
+    .control-group {
+      margin-bottom: 12px;
+    }
+
+    .control-group label {
+      display: block;
+      line-height: 1.4em;
+    }
+
+    .control-group select,
+    .control-group input[type="checkbox"] {
+      margin-right: 8px;
+      font-size: 14px;
+    }
+
+    .reset-button {
+      background: #00e0ff;
+      color: black;
+      font-weight: bold;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-top: 10px;
+      width: 100%;
+      transition: background 0.3s;
+    }
+
+    .reset-button:hover {
+      background: #00c0dd;
+    }
+
+    #togglePanelBtn {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      background: transparent;
+      border: none;
+      font-size: 18px;
+      color: white;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<!-- Control Panel UI -->
+<div class="control-panel" id="controlPanel">
+  <button id="togglePanelBtn" title="Collapse/Expand">🔽</button>
+  <h2>Whale Map Controls 🐋</h2>
+
+  <div class="control-group">
+    <label for="seasonSelect">🎯 Filter by Season:</label>
+    <select id="seasonSelect">
+      <option value="all">All Seasons</option>
+      <option value="breeding">Breeding</option>
+      <option value="feeding">Feeding</option>
+    </select>
+  </div>
+
+  <div class="control-group">
+    <label><input type="checkbox" id="migrationLineToggle" checked /> Show Migration Lines</label>
+  </div>
+
+  <div class="control-group">
+    <label><input type="checkbox" id="heartToggle" checked /> Show Breeding Icons ❤️</label>
+  </div>
+
+  <div class="control-group">
+    <label><input type="checkbox" id="feedingToggle" checked /> Show Feeding Icons 🐟</label>
+  </div>
+
+  <button id="resetFilters" class="reset-button">🔄 Reset Filters</button>
+</div>
+
+<script>
+mapboxgl.accessToken = 'pk.eyJ1IjoiYXR1cm5lIiwiYSI6ImNtN3c2dzhmdjAyaDQyam9lcHZndXQzOGYifQ.U54u7RnEjwr5J8Bu7mwCEA';
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: 'mapbox://styles/aturne/cm8z3xxih004001su354r13xd',
+  center: [-100, 20],
+  zoom: 2.5
+});
+
+// Whale facts
+const whaleFacts = {
+  "Humpback Whale": "Humpback whales sing complex songs lasting hours. Each population has a unique song.",
+  "Blue Whale": "Blue whales are the largest animals on Earth. Their hearts are the size of cars.",
+  "Gray Whale": "Gray whales migrate over 12,000 miles annually — the longest of any mammal.",
+  "Southern Right Whale": "Southern right whales have distinctive callosities used to identify individuals.",
+  "Bowhead Whale": "Bowheads can live over 200 years and survive in Arctic waters with thick blubber.",
+  "Sperm Whale": "Sperm whales can dive over 3,000 meters and use echolocation to find squid.",
+  "Fin Whale": "Fin whales are fast, second in size only to blue whales. Known as 'greyhounds of the sea'.",
+  "Minke Whale": "Minke whales are small, fast, and often curious around boats."
+};
+
+// Whale points
+const whaleData = {
+  type: "FeatureCollection",
+  features: [
+    { type: "Feature", properties: { species: "Humpback Whale", season: "breeding", location_name: "Tonga" }, geometry: { type: "Point", coordinates: [175.2, -18.65] }},
+    { type: "Feature", properties: { species: "Humpback Whale", season: "feeding", location_name: "Alaska" }, geometry: { type: "Point", coordinates: [-149.9, 60.9] }},
+    { type: "Feature", properties: { species: "Blue Whale", season: "feeding", location_name: "California" }, geometry: { type: "Point", coordinates: [-122.4, 36.8] }},
+    { type: "Feature", properties: { species: "Blue Whale", season: "breeding", location_name: "Costa Rica Dome" }, geometry: { type: "Point", coordinates: [-87.0, 9.0] }},
+    { type: "Feature", properties: { species: "Gray Whale", season: "breeding", location_name: "Baja California" }, geometry: { type: "Point", coordinates: [-114.3, 27.5] }},
+    { type: "Feature", properties: { species: "Gray Whale", season: "feeding", location_name: "Chukchi Sea" }, geometry: { type: "Point", coordinates: [178.5, 60.5] }},
+    { type: "Feature", properties: { species: "Southern Right Whale", season: "breeding", location_name: "Argentina" }, geometry: { type: "Point", coordinates: [-65.0, -42.8] }},
+    { type: "Feature", properties: { species: "Southern Right Whale", season: "feeding", location_name: "South Georgia" }, geometry: { type: "Point", coordinates: [-36.5, -54.3] }},
+    { type: "Feature", properties: { species: "Bowhead Whale", season: "feeding", location_name: "Beaufort Sea" }, geometry: { type: "Point", coordinates: [-145.0, 71.3] }},
+    { type: "Feature", properties: { species: "Bowhead Whale", season: "breeding", location_name: "Bering Sea" }, geometry: { type: "Point", coordinates: [-174.0, 62.0] }},
+    { type: "Feature", properties: { species: "Sperm Whale", season: "feeding", location_name: "Atlantic" }, geometry: { type: "Point", coordinates: [-45.0, 20.0] }},
+    { type: "Feature", properties: { species: "Fin Whale", season: "breeding", location_name: "France" }, geometry: { type: "Point", coordinates: [-5.0, 44.0] }},
+    { type: "Feature", properties: { species: "Minke Whale", season: "feeding", location_name: "North Sea" }, geometry: { type: "Point", coordinates: [2.5, 58.5] }}
+  ]
+};
+
+// Migration routes
+const migrationRoutes = {
+  type: "FeatureCollection",
+  features: [
+    { type: "Feature", properties: { label: "Humpback Migration" }, geometry: { type: "LineString", coordinates: [[175.2, -18.65], [-149.9, 60.9]] }},
+    { type: "Feature", properties: { label: "Blue Whale Migration" }, geometry: { type: "LineString", coordinates: [[-87.0, 9.0], [-122.4, 36.8]] }},
+    { type: "Feature", properties: { label: "Gray Whale Migration" }, geometry: { type: "LineString", coordinates: [[-114.3, 27.5], [178.5, 60.5]] }}
+  ]
+};
+
+// Breeding & feeding markers
+const breedingCoordinates = [
+  { coords: [175.2, -18.65], name: "Tonga" },
+  { coords: [-87.0, 9.0], name: "Costa Rica Dome" },
+  { coords: [-114.3, 27.5], name: "Baja California" },
+  { coords: [-65.0, -42.8], name: "Argentina" }
+];
+
+const feedingCoordinates = [
+  { coords: [-149.9, 60.9], name: "Alaska" },
+  { coords: [-122.4, 36.8], name: "California" },
+  { coords: [178.5, 60.5], name: "Chukchi Sea" }
+];
+
+map.on('load', () => {
+  map.addSource('whales', { type: 'geojson', data: whaleData });
+  map.addSource('routes', { type: 'geojson', data: migrationRoutes });
+
+  map.addLayer({
+    id: 'whale-points',
+    type: 'circle',
+    source: 'whales',
+    paint: {
+      'circle-radius': 20,
+      'circle-color': [
+        'match',
+        ['get', 'species'],
+        'Humpback Whale', '#FF0000',
+        'Blue Whale', '#0000FF',
+        'Gray Whale', '#FF8C00',
+        'Southern Right Whale', '#FFFF00',
+        'Bowhead Whale', '#008000',
+        'Sperm Whale', '#FF69B4',
+        'Fin Whale', '#800080',
+        'Minke Whale', '#ADD8E6',
+        '#ffffff'
+      ],
+      'circle-stroke-color': '#000',
+      'circle-stroke-width': 1
+    }
+  });
+
+  map.addLayer({
+    id: 'migration-lines',
+    type: 'line',
+    source: 'routes',
+    layout: { 'line-join': 'round', 'line-cap': 'round' },
+    paint: {
+      'line-color': '#ffffff',
+      'line-width': 4,
+      'line-dasharray': [2, 2]
+    }
+  });
+
+  map.addLayer({
+    id: 'migration-labels',
+    type: 'symbol',
+    source: 'routes',
+    layout: {
+      'symbol-placement': 'line',
+      'text-field': ['get', 'label'],
+      'text-font': ['Open Sans Bold'],
+      'text-size': 14
+    },
+    paint: {
+      'text-color': '#ffffff',
+      'text-halo-color': '#000000',
+      'text-halo-width': 2
+    }
+  });
+
+  // ❤️ Breeding icons w/ labels and popups
+  const heartMarkers = breedingCoordinates.map(loc => {
+    const el = document.createElement('div');
+    el.style.display = 'flex';
+    el.style.flexDirection = 'column';
+    el.style.alignItems = 'center';
+    el.style.textAlign = 'center';
+    el.innerHTML = `
+      <div style="font-size: 30px;">❤️</div>
+      <div style="color: white; background: rgba(0,0,0,0.7); padding: 2px 6px; border-radius: 4px; font-size: 11px;">
+        Breeding: ${loc.name}
+      </div>
+    `;
+    return new mapboxgl.Marker(el)
+      .setLngLat(loc.coords)
+      .setPopup(new mapboxgl.Popup().setHTML(`<strong>Breeding Area</strong><br>${loc.name}`))
+      .addTo(map);
+  });
+
+  // 🐟 Feeding icons w/ labels and popups
+  const feedingMarkers = feedingCoordinates.map(loc => {
+    const el = document.createElement('div');
+    el.style.display = 'flex';
+    el.style.flexDirection = 'column';
+    el.style.alignItems = 'center';
+    el.style.textAlign = 'center';
+    el.innerHTML = `
+      <div style="font-size: 30px;">🐟</div>
+      <div style="color: white; background: rgba(0,0,0,0.7); padding: 2px 6px; border-radius: 4px; font-size: 11px;">
+        Feeding: ${loc.name}
+      </div>
+    `;
+    return new mapboxgl.Marker(el)
+      .setLngLat(loc.coords)
+      .setPopup(new mapboxgl.Popup().setHTML(`<strong>Feeding Area</strong><br>${loc.name}`))
+      .addTo(map);
+  });
+
+  // Whale popup
+  map.on('click', 'whale-points', (e) => {
+    const p = e.features[0].properties;
+    const fact = whaleFacts[p.species] || "This whale is fascinating!";
+    new mapboxgl.Popup()
+      .setLngLat(e.lngLat)
+      .setHTML(`<h3>${p.species}</h3><strong>Location:</strong> ${p.location_name}<br><br><strong>Fun Fact:</strong><br>${fact}`)
+      .addTo(map);
+  });
+
+  // Filter functionality
+  document.getElementById('seasonSelect').addEventListener('change', (e) => {
+    const val = e.target.value;
+    const filter = val === 'all' ? null : ['==', ['get', 'season'], val];
+    map.setFilter('whale-points', filter);
+  });
+
+  document.getElementById('migrationLineToggle').addEventListener('change', (e) => {
+    const vis = e.target.checked ? 'visible' : 'none';
+    map.setLayoutProperty('migration-lines', 'visibility', vis);
+    map.setLayoutProperty('migration-labels', 'visibility', vis);
+  });
+
+  document.getElementById('heartToggle').addEventListener('change', (e) => {
+    heartMarkers.forEach(m => m.getElement().style.display = e.target.checked ? 'block' : 'none');
+  });
+
+  document.getElementById('feedingToggle').addEventListener('change', (e) => {
+    feedingMarkers.forEach(m => m.getElement().style.display = e.target.checked ? 'block' : 'none');
+  });
+
+  document.getElementById('resetFilters').addEventListener('click', () => {
+    document.getElementById('seasonSelect').value = 'all';
+    document.getElementById('migrationLineToggle').checked = true;
+    document.getElementById('heartToggle').checked = true;
+    document.getElementById('feedingToggle').checked = true;
+
+    map.setFilter('whale-points', null);
+    map.setLayoutProperty('migration-lines', 'visibility', 'visible');
+    map.setLayoutProperty('migration-labels', 'visibility', 'visible');
+    heartMarkers.forEach(m => m.getElement().style.display = 'block');
+    feedingMarkers.forEach(m => m.getElement().style.display = 'block');
+  });
+
+  document.getElementById('togglePanelBtn').addEventListener('click', () => {
+    const panel = document.getElementById('controlPanel');
+    panel.classList.toggle('collapsed');
+    document.getElementById('togglePanelBtn').textContent =
+      panel.classList.contains('collapsed') ? '▶' : '🔽';
+  });
+});
+</script>
+
+</body>
+</html>
